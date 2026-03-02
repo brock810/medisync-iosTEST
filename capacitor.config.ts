@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'MediSyncLabs DEV',
   webDir: 'dist',
   server: {
-    url: 'http://192.168.1.127:8056',  
+    url: 'http://192.168.1.127:8056/ios',  
     cleartext: true
   }
 };
