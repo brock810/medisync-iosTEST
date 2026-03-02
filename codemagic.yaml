@@ -20,6 +20,7 @@ workflows:
         WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
         CONFIGURATION: "Release"
+        APP_STORE_APPLE_ID: "6759877855"
 
     scripts:
       - name: Show versions
@@ -109,6 +110,23 @@ workflows:
           xcode-project use-profiles --project "$PROJECT"
           echo "Installed provisioning profiles:"
           ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
+
+      - name: Increment iOS build number
+        script: |
+          set -euo pipefail
+          cd ios/App
+
+          # Fetch latest uploaded build number from App Store Connect / TestFlight
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 1)
+
+          echo "Latest uploaded build number: $LATEST_BUILD_NUMBER"
+
+          # Set next build number
+          agvtool new-version -all $((LATEST_BUILD_NUMBER + 1))
+
+          echo "New build number set to:"
+          agvtool what-version -terse
+          cd ../..
 
       - name: Build signed IPA
         script: |
