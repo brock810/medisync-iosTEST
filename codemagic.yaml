@@ -37,6 +37,13 @@ workflows:
         script: |
           npm ls typescript || npm i -D typescript
 
+      - name: Build web (dist)
+        script: |
+          set -euo pipefail
+          npm run build
+          echo "Dist contents:"
+          ls -la dist || true
+
       - name: Capacitor sync iOS
         script: |
           npx cap sync ios
