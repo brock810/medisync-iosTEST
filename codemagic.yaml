@@ -22,6 +22,9 @@ workflows:
         CONFIGURATION: "Release"
         APP_STORE_APPLE_ID: "6759877855"
 
+        # Optional but helpful for CI paths
+        ASSET_PATH: "./resources"
+
     scripts:
       - name: Show versions
         script: |
@@ -36,6 +39,28 @@ workflows:
       - name: Ensure TypeScript exists
         script: |
           npm ls typescript || npm i -D typescript
+
+      # ✅ Ensure IAP + splash asset tooling exists (safe if already in package.json)
+      - name: Ensure Capacitor assets + IAP deps exist
+        script: |
+          npm ls @capacitor/assets || npm i -D @capacitor/assets
+          npm ls @capacitor/splash-screen || npm i @capacitor/splash-screen
+          npm ls @capacitor-community/in-app-purchases || npm i @capacitor-community/in-app-purchases
+
+      # ✅ Generate native splash/icon assets from ./resources (logo loader)
+      # Expect:
+      #   ./resources/splash.png
+      #   ./resources/icon.png   (optional but recommended)
+      - name: Generate iOS splash/icon assets
+        script: |
+          set -euo pipefail
+          if [ -d "${ASSET_PATH}" ]; then
+            echo "Resources folder found at ${ASSET_PATH}"
+            ls -la "${ASSET_PATH}" || true
+            npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
+          else
+            echo "No ${ASSET_PATH} folder; skipping capacitor-assets generate."
+          fi
 
       - name: Capacitor sync iOS
         script: |
@@ -116,12 +141,9 @@ workflows:
           set -euo pipefail
           cd ios/App
 
-          # Fetch latest uploaded build number from App Store Connect / TestFlight
           LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 1)
-
           echo "Latest uploaded build number: $LATEST_BUILD_NUMBER"
 
-          # Set next build number
           agvtool new-version -all $((LATEST_BUILD_NUMBER + 1))
 
           echo "New build number set to:"

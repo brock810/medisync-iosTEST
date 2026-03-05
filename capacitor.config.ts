@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
   server: {
     cleartext: true,
     allowNavigation: [
-      '192.168.1.127',
+      '192.168.1.127/manual_entry',
       'http://192.168.1.127:8056/manual_entry',
       '192.168.1.127:8056/manual_entry',
       '*.medisynclabs.ca',
@@ -18,12 +18,12 @@ const config: CapacitorConfig = {
   },
 
   ios: {
-    backgroundColor: '#0d6efd'
+    backgroundColor: '#91bfff' // ✅ nicer than bright blue for that logo
   },
 
   plugins: {
     SplashScreen: {
-      backgroundColor: '#0d6efd',
+      backgroundColor: '#80b5ff', // ✅ splash flash color
       launchAutoHide: true,
       showSpinner: false
     }
