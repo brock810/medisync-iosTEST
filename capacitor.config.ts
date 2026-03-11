@@ -9,8 +9,8 @@ const config: CapacitorConfig = {
     cleartext: true,
     allowNavigation: [
       '192.168.1.127',
-      'http://192.168.1.127:8056/manual_entry',
-      '192.168.1.127:8056/manual_entry',
+      'http://192.168.1.127:8086/manual_entry',
+      '192.168.1.127:8086/manual_entry',
       '*.medisynclabs.ca',
       'medisynclabs.ca',
       'www.medisynclabs.ca',
