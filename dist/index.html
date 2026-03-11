@@ -307,33 +307,37 @@
   </main>
 
 <script>
-  const BASE = "http://192.168.1.127:8056";
+  const BASE = "http://192.168.1.127:8086";
 
   document.getElementById("logoImg").src = `${BASE}/static/medisync-logo2.png`;
+
+  (async function autoEntry() {
+    try {
+      const res = await fetch(`${BASE}/auth_status`, {
+        method: "GET",
+        credentials: "include"
+      });
+
+      if (!res.ok) {
+        console.warn("auth_status check failed:", res.status);
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data && data.logged_in) {
+        window.location.replace(`${BASE}/manual_entry`);
+      }
+    } catch (err) {
+      console.warn("Could not check auth status:", err);
+    }
+  })();
 
   const form = document.getElementById("iosQuickSignupForm");
   form.action = `${BASE}/signup`;
 
   const loginLink = document.getElementById("loginLink");
   loginLink.href = `${BASE}/login`;
-
-  (async function autoEntry() {
-    try {
-      const res = await fetch(`${BASE}/auth_status`, {
-        credentials: 'include'
-      });
-
-      if (!res.ok) return;
-
-      const data = await res.json();
-
-      if (data.logged_in) {
-        window.location.replace(`${BASE}/manual_entry`);
-      }
-    } catch (err) {
-      console.log('Auth check failed:', err);
-    }
-  })();
 </script>
 
   <!-- Keep your existing analytics + validation scripts below (unchanged) -->
