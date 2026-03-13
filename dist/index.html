@@ -306,40 +306,45 @@
     </div>
   </main>
 
-<script>
+  <script>
   const BASE = "http://192.168.1.127:8086";
 
   document.getElementById("logoImg").src = `${BASE}/static/medisync-logo2.png`;
-
-  (async function autoEntry() {
-    try {
-      const res = await fetch(`${BASE}/auth_status`, {
-        method: "GET",
-        credentials: "include"
-      });
-
-      if (!res.ok) {
-        console.warn("auth_status check failed:", res.status);
-        return;
-      }
-
-      const data = await res.json();
-
-      if (data && data.logged_in) {
-        window.location.replace(`${BASE}/manual_entry`);
-      }
-    } catch (err) {
-      console.warn("Could not check auth status:", err);
-    }
-  })();
 
   const form = document.getElementById("iosQuickSignupForm");
   form.action = `${BASE}/signup`;
 
   const loginLink = document.getElementById("loginLink");
   loginLink.href = `${BASE}/login`;
-</script>
 
+  async function checkExistingSessionAndRedirect() {
+    try {
+      const res = await fetch(`${BASE}/app-auth-status`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store"
+      });
+
+      if (!res.ok) {
+        console.log("app-auth-status not ok:", res.status);
+        return;
+      }
+
+      const data = await res.json();
+      console.log("app-auth-status:", data);
+
+      if (data && data.authenticated === true && data.redirect_url) {
+        window.location.replace(data.redirect_url);
+      }
+    } catch (err) {
+      console.log("Session check failed:", err);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    checkExistingSessionAndRedirect();
+  });
+</script>
   <!-- Keep your existing analytics + validation scripts below (unchanged) -->
   <script>
     function fireGoogleAdsSignupConversion(dedupeKey, done){
