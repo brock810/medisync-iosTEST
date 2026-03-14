@@ -15,7 +15,7 @@
   <meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />
   <meta name="description" content="MediSync Labs helps you understand your bloodwork with clear educational health insights." />
 
-  <title>MediSync Labs (DEV)</title>
+  <title>MediSync Labs</title>
 
   <style>
     /* --- your styles unchanged --- */
@@ -156,7 +156,7 @@
       line-height: 1.58;
     }
 
-    .form-wrap { display:grid; gap:12px; margin-top: 8px; }
+    .form-wrap { display:grid; gap:14px; margin-top: 10px; }
 
     .input-shell {
       display:flex; align-items:center; gap:10px;
@@ -204,15 +204,140 @@
       box-shadow: 0 18px 35px rgba(0, 200, 255, 0.26);
     }
 
-    .secondary-btn {
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      color:#eef9ff;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.09);
-    }
+.cta-btn:hover,
+.cta-btn:active {
+  transform: translateY(-1px);
+  box-shadow:
+    0 22px 40px rgba(0, 200, 255, 0.30),
+    0 0 0 4px rgba(0, 200, 255, 0.08);
+}
 
+.cta-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(0, 200, 255, 0.14),
+    0 22px 40px rgba(0, 200, 255, 0.30);
+}
+
+.secondary-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  color: #f3fbff;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.085), rgba(255,255,255,0.045));
+  border: 1px solid rgba(107, 231, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 10px 28px rgba(0,0,0,0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow: hidden;
+}
+
+.secondary-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 50%, rgba(0, 200, 255, 0.12), transparent 34%),
+    linear-gradient(90deg, rgba(255,255,255,0.03), transparent 36%);
+  pointer-events: none;
+}
+
+.secondary-btn:hover,
+.secondary-btn:active {
+  transform: translateY(-1px);
+  border-color: rgba(107, 231, 255, 0.34);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.06));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 16px 34px rgba(0,0,0,0.2),
+    0 0 0 4px rgba(0, 200, 255, 0.06);
+}
+
+.secondary-btn:focus-visible {
+  outline: none;
+  border-color: rgba(107, 231, 255, 0.52);
+  box-shadow:
+    0 0 0 4px rgba(0, 200, 255, 0.12),
+    0 16px 34px rgba(0,0,0,0.2);
+}
+
+.secondary-icon,
+.secondary-copy,
+.secondary-arrow {
+  position: relative;
+  z-index: 1;
+}
+
+.secondary-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(0,200,255,0.18), rgba(0,200,255,0.08));
+  border: 1px solid rgba(107, 231, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.secondary-icon svg {
+  width: 18px;
+  height: 18px;
+  color: #bff7ff;
+  opacity: 0.95;
+}
+
+.secondary-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.secondary-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #89a7bc;
+  line-height: 1.1;
+  margin-bottom: 3px;
+}
+
+.secondary-title {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #f3fbff;
+}
+
+.secondary-arrow {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #9fefff;
+  opacity: 0.95;
+  transform: translateX(0);
+  transition: transform .18s ease, opacity .18s ease;
+}
+
+.secondary-btn:hover .secondary-arrow,
+.secondary-btn:active .secondary-arrow {
+  transform: translateX(2px);
+}
     .error-text {
       display:none;
       margin:0;
@@ -245,10 +370,53 @@
       .card { padding: 24px 16px 18px; border-radius: 24px; }
       .headline { font-size: 2.1rem; }
       .subtext { font-size: 0.97rem; }
+      .secondary-btn {
+        min-height: 60px;
+        padding: 13px 14px;
+        border-radius: 18px;
+      }
+
+      .secondary-icon {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        border-radius: 12px;
+      }
+
+      .secondary-title {
+        font-size: 0.96rem;
+      }
+
+      .secondary-label {
+        font-size: 0.68rem;
+      }
     }
-    @media (max-width: 361px) {
-      .headline { font-size: 1.75rem; line-height: 1; letter-spacing: -0.05em; }
-    }
+
+@media (max-width: 361px) {
+  .headline {
+    font-size: 1.75rem;
+    line-height: 1;
+    letter-spacing: -0.05em;
+  }
+
+  .secondary-title {
+    font-size: 0.88rem;
+  }
+
+  .secondary-label {
+    font-size: 0.64rem;
+  }
+
+  .secondary-btn {
+    padding: 12px 13px;
+  }
+
+  .secondary-icon {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+}
   </style>
 </head>
 
@@ -295,7 +463,20 @@
             <p id="emailError" class="error-text">Please enter a valid email address.</p>
 
             <button class="cta-btn" type="submit">Continue</button>
-            <a class="secondary-btn" id="loginLink" href="#">I already have an account</a>
+
+            <a class="secondary-btn login-btn" id="loginLink" href="#">
+              <span class="secondary-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"></path>
+                  <path d="M4.75 19.25a7.25 7.25 0 0 1 14.5 0"></path>
+                </svg>
+              </span>
+              <span class="secondary-copy">
+                <span class="secondary-label">Returning user</span>
+                <span class="secondary-title">Continue to my account</span>
+              </span>
+              <span class="secondary-arrow" aria-hidden="true">→</span>
+            </a>
           </form>
 
           <p class="footer-note">
@@ -327,6 +508,15 @@
 
     const loginLink = document.getElementById("loginLink");
     loginLink.href = `${BASE}/login`;
+
+    loginLink.addEventListener("click", function(e) {
+      e.preventDefault();
+      if (window.MSL_LOADER) {
+        window.MSL_LOADER.go(`${BASE}/login`, e);
+      } else {
+        window.location.assign(`${BASE}/login`);
+      }
+    });
   </script>
 
   <!-- Keep your existing analytics + validation scripts below (unchanged) -->
@@ -467,12 +657,15 @@
 
           if (typeof isInternalTestEmail === "function" && isInternalTestEmail(email)) {
             console.log("[gads] skipped for internal/test email:", email);
+            if (window.MSL_LOADER) window.MSL_LOADER.show();
             form.submit();
           } else if (typeof fireGoogleAdsSignupConversion === "function") {
+            if (window.MSL_LOADER) window.MSL_LOADER.show();
             fireGoogleAdsSignupConversion(eventID, function () {
               form.submit();
             });
           } else {
+            if (window.MSL_LOADER) window.MSL_LOADER.show();
             form.submit();
           }
         });
@@ -505,5 +698,82 @@
       }
     })();
   </script>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay"
+     style="
+       position: fixed;
+       inset: 0;
+       background: rgba(6, 16, 27, 0.72);
+       backdrop-filter: blur(8px);
+       -webkit-backdrop-filter: blur(8px);
+       z-index: 50000;
+       display: none;
+       align-items: center;
+       justify-content: center;
+       flex-direction: column;
+       text-align: center;
+       padding: 24px;
+     ">
+  <div class="msl-loader-ring"></div>
+  <div style="margin-top:14px; font-weight:800; color:#eafaff; font-size:1rem; letter-spacing:-0.02em;">
+    Please wait…
+  </div>
+</div>
+
+<style>
+  .msl-loader-ring {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.16);
+    border-top-color: #00c8ff;
+    border-right-color: #7effcf;
+    animation: mslSpin .8s linear infinite;
+    box-shadow: 0 0 24px rgba(0, 200, 255, 0.18);
+  }
+
+  @keyframes mslSpin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('loadingOverlay');
+  if (!overlay) return;
+
+  let isShown = false;
+
+  function showLoading() {
+    if (isShown) return;
+    isShown = true;
+    overlay.style.display = 'flex';
+  }
+
+  function hideLoading() {
+    isShown = false;
+    overlay.style.display = 'none';
+  }
+
+  window.MSL_LOADER = {
+    show: showLoading,
+    hide: hideLoading,
+    go(url, e) {
+      try {
+        if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1)) return;
+      } catch (_) {}
+      showLoading();
+      setTimeout(() => window.location.assign(url), 20);
+    }
+  };
+
+  window.addEventListener('pageshow', () => {
+    hideLoading();
+  });
+
+  window.addEventListener('error', hideLoading);
+  window.addEventListener('unhandledrejection', hideLoading);
+});
+</script>
 </body>
 </html>
