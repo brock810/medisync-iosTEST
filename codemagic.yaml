@@ -150,7 +150,7 @@ workflows:
           set -euo pipefail
           cd ios/App
 
-          UNIQUE_BUILD_NUMBER=$(date +%y%m%d%H%M)
+          UNIQUE_BUILD_NUMBER=$(date +%y%m%d)
           echo "Using unique build number: $UNIQUE_BUILD_NUMBER"
 
           agvtool new-version -all "$UNIQUE_BUILD_NUMBER"
