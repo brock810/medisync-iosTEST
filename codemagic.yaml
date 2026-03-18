@@ -11,15 +11,16 @@ workflows:
 
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.quantumwebdynamics.medisynclabs
+        bundle_identifier: com.quantumwebdynamics.medisynclabs.dev
 
       vars:
         TEAM_ID: "L5GY5W76NG"
-        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs"
+        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs.dev"
         PROJECT: "ios/App/App.xcodeproj"
         WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
-        CONFIGURATION: "Debug"
+        CONFIGURATION: "Release"
+        APP_STORE_APPLE_ID: "6759877855"
         ASSET_PATH: "./resources"
 
     scripts:
@@ -84,11 +85,11 @@ workflows:
           set -euo pipefail
           npx cap sync ios
 
-      - name: Force bundle id in iOS native project
+      - name: Force dev bundle id in iOS native project
         script: |
           set -euo pipefail
 
-          echo "Forcing bundle id to: ${BUNDLE_ID}"
+          echo "Forcing dev bundle id to: ${BUNDLE_ID}"
 
           /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" ios/App/App/App/Info.plist || true
 
@@ -206,11 +207,11 @@ workflows:
 
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.quantumwebdynamics.medisynclabs
+        bundle_identifier: com.quantumwebdynamics.medisynclabs.dev
 
       vars:
         TEAM_ID: "L5GY5W76NG"
-        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs"
+        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs.dev"
         PROJECT: "ios/App/App.xcodeproj"
         WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
@@ -273,9 +274,11 @@ workflows:
           set -euo pipefail
           npx cap sync ios
 
-      - name: Force bundle id in iOS native project
+      - name: Force dev bundle id in iOS native project
         script: |
           set -euo pipefail
+
+          echo "Forcing dev bundle id to: ${BUNDLE_ID}"
 
           /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" ios/App/App/App/Info.plist || true
 
@@ -286,6 +289,21 @@ workflows:
             echo "Missing project.pbxproj at $PBX"
             exit 1
           fi
+
+      - name: Verify dev bundle id is set everywhere
+        script: |
+          set -euo pipefail
+
+          echo "Checking bundle IDs..."
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" ios/App/App/App/Info.plist || true
+          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/App/App.xcodeproj/project.pbxproj | head -20 || true
+
+          if ! grep -q "com.quantumwebdynamics.medisynclabs.dev" ios/App/App.xcodeproj/project.pbxproj; then
+            echo "❌ Dev bundle ID was not applied to project.pbxproj"
+            exit 1
+          fi
+
+          echo "✅ Dev bundle ID found in native iOS project."
 
       - name: Install CocoaPods
         script: |
