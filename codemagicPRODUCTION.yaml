@@ -1,0 +1,191 @@
+workflows:
+  ios_testflight:
+    name: iOS TestFlight (Capacitor)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: latest
+      groups:
+        - ios_testflight
+
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.quantumwebdynamics.medisynclabs
+
+      vars:
+        WORKSPACE: "ios/App/App.xcworkspace"
+        SCHEME: "App"
+        CONFIGURATION: "Release"
+
+    scripts:
+      - name: Show versions
+        script: |
+          node -v
+          npm -v
+          xcodebuild -version
+
+      - name: Install dependencies
+        script: |
+          npm ci
+
+      - name: Ensure TypeScript exists (required for capacitor.config.ts)
+        script: |
+          npm ls typescript || npm i -D typescript
+
+      - name: Capacitor sync iOS
+        script: |
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+          cd ../..
+
+      # ---- App Store Connect API Key (.p8) via base64 env var ----
+      - name: Restore App Store Connect API key
+        script: |
+          set -euo pipefail
+          if [ -z "${APP_STORE_CONNECT_API_KEY_BASE64:-}" ]; then
+            echo "Missing APP_STORE_CONNECT_API_KEY_BASE64 env var."
+            exit 1
+          fi
+
+          # macOS base64 uses -D; GNU uses --decode. Try both.
+          echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -D > "$CM_BUILD_DIR/AuthKey_M798L583DA.p8" 2>/dev/null || \
+          echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > "$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
+
+          ls -la "$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
+          echo "Key header:"
+          head -n 1 "$CM_BUILD_DIR/AuthKey_M798L583DA.p8" || true
+
+      - name: Verify Xcode workspace and schemes
+        script: |
+          set -euo pipefail
+          if [ ! -d "$WORKSPACE" ]; then
+            echo "Workspace not found (dir) at: $WORKSPACE"
+            echo "Listing ios/App:"
+            ls -la ios/App || true
+            exit 1
+          fi
+          xcodebuild -list -workspace "$WORKSPACE"
+
+      - name: Apply Codemagic code signing profiles
+        script: |
+          set -euo pipefail
+          xcode-project use-profiles
+          echo "Installed provisioning profiles:"
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
+
+      - name: Build archive
+        script: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            archive
+
+      - name: Export IPA
+        script: |
+          set -euo pipefail
+
+          # Find the installed profile name that Codemagic used
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_FILE="$(ls -1 "$PROFILES_DIR"/*.mobileprovision | head -n 1)"
+
+          if [ -z "${PROFILE_FILE:-}" ] || [ ! -f "$PROFILE_FILE" ]; then
+            echo "No provisioning profile file found in: $PROFILES_DIR"
+            ls -la "$PROFILES_DIR" || true
+            exit 1
+          fi
+
+          PROFILE_NAME=$(/usr/bin/security cms -D -i "$PROFILE_FILE" \
+            | /usr/bin/plutil -extract Name raw -o - -)
+
+          echo "Using export provisioning profile: $PROFILE_NAME"
+          echo "Profile file: $PROFILE_FILE"
+
+          cat > "$CM_BUILD_DIR/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+
+            <key>teamID</key>
+            <string>${TEAM_ID}</string>
+
+            <key>signingStyle</key>
+            <string>manual</string>
+
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+
+            <key>compileBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
+            -exportOptionsPlist "$CM_BUILD_DIR/ExportOptions.plist" \
+            -exportPath "$CM_BUILD_DIR/build/ipa"
+
+          echo "Exported files:"
+          ls -la "$CM_BUILD_DIR/build/ipa" || true
+
+      - name: Upload to TestFlight (manual)
+        script: |
+          set -euo pipefail
+
+          IPA_PATH="$CM_BUILD_DIR/build/ipa/App.ipa"
+          if [ ! -f "$IPA_PATH" ]; then
+            echo "IPA not found at: $IPA_PATH"
+            ls -la "$CM_BUILD_DIR/build/ipa" || true
+            exit 1
+          fi
+
+          KEY_PATH="$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
+          if [ ! -f "$KEY_PATH" ]; then
+            echo "Missing .p8 key at: $KEY_PATH"
+            exit 1
+          fi
+
+          echo "Sanity check key header:"
+          head -n 2 "$KEY_PATH" || true
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
+            echo "Key file does not look like PEM. Dumping first 5 lines:"
+            sed -n '1,5p' "$KEY_PATH" || true
+            exit 1
+          fi
+
+          # IMPORTANT: app-store-connect expects PEM via @env:... (not a file path)
+          export APP_STORE_CONNECT_PUBLISHER_PRIVATE_KEY="$(cat "$KEY_PATH")"
+
+          echo "Uploading IPA to TestFlight..."
+          app-store-connect publish \
+            --path "$IPA_PATH" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --private-key @env:APP_STORE_CONNECT_PUBLISHER_PRIVATE_KEY \
+            --testflight \
+            --platform IOS
+
+    artifacts:
+      - build/ipa/*.ipa
+      - $HOME/Library/Logs/**/*
+      - $CM_BUILD_DIR/build/**/*.xcarchive
