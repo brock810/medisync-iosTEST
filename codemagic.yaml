@@ -19,8 +19,7 @@ workflows:
         PROJECT: "ios/App/App.xcodeproj"
         WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
-        CONFIGURATION: "Release"
-        APP_STORE_APPLE_ID: "6759877855"
+        CONFIGURATION: "Debug"
         ASSET_PATH: "./resources"
 
     scripts:
@@ -100,6 +99,21 @@ workflows:
             echo "Missing project.pbxproj at $PBX"
             exit 1
           fi
+
+      - name: Verify dev bundle id is set everywhere
+        script: |
+          set -euo pipefail
+
+          echo "Checking bundle IDs..."
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" ios/App/App/App/Info.plist || true
+          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/App/App.xcodeproj/project.pbxproj | head -20 || true
+
+          if ! grep -q "com.quantumwebdynamics.medisynclabs.dev" ios/App/App.xcodeproj/project.pbxproj; then
+            echo "❌ Dev bundle ID was not applied to project.pbxproj"
+            exit 1
+          fi
+
+          echo "✅ Dev bundle ID found in native iOS project."
 
       - name: Install CocoaPods
         script: |
