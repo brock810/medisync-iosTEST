@@ -1,3 +1,368 @@
+workflows:
+  ios_testflight:
+    name: iOS TestFlight (Capacitor)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: latest
+      groups:
+        - test_flight
+
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.quantumwebdynamics.medisynclabs.dev
+
+      vars:
+        TEAM_ID: "L5GY5W76NG"
+        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs.dev"
+        PROJECT: "ios/App/App.xcodeproj"
+        WORKSPACE: "ios/App/App.xcworkspace"
+        SCHEME: "App"
+        CONFIGURATION: "Release"
+        APP_STORE_APPLE_ID: "6759877855"
+        ASSET_PATH: "./resources"
+
+    scripts:
+      - name: Show versions
+        script: |
+          node -v
+          npm -v
+          xcodebuild -version
+
+      - name: Install dependencies (locked, no npm token)
+        script: |
+          set -euo pipefail
+          export NPM_CONFIG_USERCONFIG=/dev/null
+          export NPM_CONFIG_FUND=false
+          export NPM_CONFIG_AUDIT=false
+          npm ci
+
+      - name: Verify required JS deps are present (fail fast)
+        script: |
+          set -euo pipefail
+
+          echo "Verifying required deps exist in node_modules (from package-lock)..."
+
+          if ! npm ls @capgo/native-purchases >/dev/null 2>&1; then
+            echo "❌ Missing @capgo/native-purchases"
+            exit 1
+          fi
+
+          if ! npm ls @capacitor/assets >/dev/null 2>&1; then
+            echo "❌ Missing @capacitor/assets"
+            exit 1
+          fi
+
+          if ! npm ls @capacitor/splash-screen >/dev/null 2>&1; then
+            echo "❌ Missing @capacitor/splash-screen"
+            exit 1
+          fi
+
+          if ! npm ls typescript >/dev/null 2>&1; then
+            echo "❌ Missing typescript"
+            exit 1
+          fi
+
+          echo "✅ All required deps found."
+
+      - name: Generate iOS splash/icon assets (logo loader)
+        script: |
+          set -euo pipefail
+
+          if [ -d "${ASSET_PATH}" ]; then
+            if [ -f "${ASSET_PATH}/splash.png" ]; then
+              npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
+            else
+              echo "No splash.png found in ${ASSET_PATH} (skipping asset generation)."
+            fi
+          else
+            echo "No ${ASSET_PATH} folder; skipping capacitor-assets generate."
+          fi
+
+      - name: Capacitor sync iOS
+        script: |
+          set -euo pipefail
+          npx cap sync ios
+
+      - name: Force dev bundle id in iOS native project
+        script: |
+          set -euo pipefail
+
+          echo "Forcing dev bundle id to: ${BUNDLE_ID}"
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" ios/App/App/App/Info.plist || true
+
+          PBX="ios/App/App.xcodeproj/project.pbxproj"
+          if [ -f "$PBX" ]; then
+            sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID};/g" "$PBX"
+          else
+            echo "Missing project.pbxproj at $PBX"
+            exit 1
+          fi
+
+      - name: Verify dev bundle id is set everywhere
+        script: |
+          set -euo pipefail
+
+          echo "Checking bundle IDs..."
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" ios/App/App/App/Info.plist || true
+          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/App/App.xcodeproj/project.pbxproj | head -20 || true
+
+          if ! grep -q "com.quantumwebdynamics.medisynclabs.dev" ios/App/App.xcodeproj/project.pbxproj; then
+            echo "❌ Dev bundle ID was not applied to project.pbxproj"
+            exit 1
+          fi
+
+          echo "✅ Dev bundle ID found in native iOS project."
+
+      - name: Install CocoaPods
+        script: |
+          set -euo pipefail
+          cd ios/App
+          pod install
+          cd ../..
+
+      - name: Disable signing for Pods/framework targets
+        script: |
+          set -euo pipefail
+
+          ruby <<'RUBY'
+          pbxproj = "ios/App/Pods/Pods.xcodeproj/project.pbxproj"
+
+          unless File.exist?(pbxproj)
+            puts "Pods project not found at #{pbxproj}"
+            exit 1
+          end
+
+          text = File.read(pbxproj)
+          text.gsub!(/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/, 'PROVISIONING_PROFILE_SPECIFIER = "";')
+          text.gsub!(/PROVISIONING_PROFILE = [^;]*;/, 'PROVISIONING_PROFILE = "";')
+          text.gsub!(/CODE_SIGN_STYLE = Manual;/, 'CODE_SIGN_STYLE = Automatic;')
+          text.gsub!(/CODE_SIGNING_ALLOWED = YES;/, 'CODE_SIGNING_ALLOWED = NO;')
+          text.gsub!(/CODE_SIGNING_REQUIRED = YES;/, 'CODE_SIGNING_REQUIRED = NO;')
+          File.write(pbxproj, text)
+          puts "Updated Pods signing settings."
+          RUBY
+
+      - name: Verify Xcode workspace and schemes
+        script: |
+          set -euo pipefail
+          if [ ! -d "$WORKSPACE" ]; then
+            echo "Workspace not found at: $WORKSPACE"
+            ls -la ios/App || true
+            exit 1
+          fi
+          xcodebuild -list -workspace "$WORKSPACE"
+
+      - name: Apply Codemagic code signing profiles
+        script: |
+          set -euo pipefail
+          xcode-project use-profiles --project "$PROJECT"
+
+      - name: Set unique iOS build number
+        script: |
+          set -euo pipefail
+          cd ios/App
+
+          UNIQUE_BUILD_NUMBER=$(date +%y%m%d%H%M)
+          echo "Using unique build number: $UNIQUE_BUILD_NUMBER"
+
+          agvtool new-version -all "$UNIQUE_BUILD_NUMBER"
+
+          echo "Verifying build number..."
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" App/App/Info.plist || true
+
+          cd ../..
+
+      - name: Build signed IPA
+        script: |
+          set -euo pipefail
+          xcode-project build-ipa \
+            --workspace "$WORKSPACE" \
+            --scheme "$SCHEME" \
+            --config "$CONFIGURATION"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/Archives/**/*.xcarchive
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+
+  ios_remote_debug:
+    name: iOS Remote Debug (VNC + Xcode)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      node: latest
+      groups:
+        - test_flight
+
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.quantumwebdynamics.medisynclabs.dev
+
+      vars:
+        TEAM_ID: "L5GY5W76NG"
+        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs.dev"
+        PROJECT: "ios/App/App.xcodeproj"
+        WORKSPACE: "ios/App/App.xcworkspace"
+        SCHEME: "App"
+        CONFIGURATION: "Debug"
+        ASSET_PATH: "./resources"
+
+    scripts:
+      - name: Show versions
+        script: |
+          node -v
+          npm -v
+          xcodebuild -version
+
+      - name: Install dependencies
+        script: |
+          set -euo pipefail
+          export NPM_CONFIG_USERCONFIG=/dev/null
+          export NPM_CONFIG_FUND=false
+          export NPM_CONFIG_AUDIT=false
+          npm ci
+
+      - name: Verify required JS deps
+        script: |
+          set -euo pipefail
+
+          if ! npm ls @capgo/native-purchases >/dev/null 2>&1; then
+            echo "❌ Missing @capgo/native-purchases"
+            exit 1
+          fi
+
+          if ! npm ls @capacitor/assets >/dev/null 2>&1; then
+            echo "❌ Missing @capacitor/assets"
+            exit 1
+          fi
+
+          if ! npm ls @capacitor/splash-screen >/dev/null 2>&1; then
+            echo "❌ Missing @capacitor/splash-screen"
+            exit 1
+          fi
+
+          if ! npm ls typescript >/dev/null 2>&1; then
+            echo "❌ Missing typescript"
+            exit 1
+          fi
+
+          echo "✅ Dependencies look good."
+
+      - name: Generate iOS splash/icon assets
+        script: |
+          set -euo pipefail
+
+          if [ -d "${ASSET_PATH}" ] && [ -f "${ASSET_PATH}/splash.png" ]; then
+            npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
+          else
+            echo "Skipping capacitor-assets generate."
+          fi
+
+      - name: Capacitor sync iOS
+        script: |
+          set -euo pipefail
+          npx cap sync ios
+
+      - name: Force dev bundle id in iOS native project
+        script: |
+          set -euo pipefail
+
+          echo "Forcing dev bundle id to: ${BUNDLE_ID}"
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" ios/App/App/App/Info.plist || true
+
+          PBX="ios/App/App.xcodeproj/project.pbxproj"
+          if [ -f "$PBX" ]; then
+            sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID};/g" "$PBX"
+          else
+            echo "Missing project.pbxproj at $PBX"
+            exit 1
+          fi
+
+      - name: Verify dev bundle id is set everywhere
+        script: |
+          set -euo pipefail
+
+          echo "Checking bundle IDs..."
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" ios/App/App/App/Info.plist || true
+          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/App/App.xcodeproj/project.pbxproj | head -20 || true
+
+          if ! grep -q "com.quantumwebdynamics.medisynclabs.dev" ios/App/App.xcodeproj/project.pbxproj; then
+            echo "❌ Dev bundle ID was not applied to project.pbxproj"
+            exit 1
+          fi
+
+          echo "✅ Dev bundle ID found in native iOS project."
+
+      - name: Install CocoaPods
+        script: |
+          set -euo pipefail
+          cd ios/App
+          pod install
+          cd ../..
+
+      - name: Disable signing for Pods/framework targets
+        script: |
+          set -euo pipefail
+
+          ruby <<'RUBY'
+          pbxproj = "ios/App/Pods/Pods.xcodeproj/project.pbxproj"
+
+          unless File.exist?(pbxproj)
+            puts "Pods project not found at #{pbxproj}"
+            exit 1
+          end
+
+          text = File.read(pbxproj)
+          text.gsub!(/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/, 'PROVISIONING_PROFILE_SPECIFIER = "";')
+          text.gsub!(/PROVISIONING_PROFILE = [^;]*;/, 'PROVISIONING_PROFILE = "";')
+          text.gsub!(/CODE_SIGN_STYLE = Manual;/, 'CODE_SIGN_STYLE = Automatic;')
+          text.gsub!(/CODE_SIGNING_ALLOWED = YES;/, 'CODE_SIGNING_ALLOWED = NO;')
+          text.gsub!(/CODE_SIGNING_REQUIRED = YES;/, 'CODE_SIGNING_REQUIRED = NO;')
+          File.write(pbxproj, text)
+          puts "Updated Pods signing settings."
+          RUBY
+
+      - name: Verify Xcode workspace and schemes
+        script: |
+          set -euo pipefail
+          if [ ! -d "$WORKSPACE" ]; then
+            echo "Workspace not found at: $WORKSPACE"
+            ls -la ios/App || true
+            exit 1
+          fi
+          xcodebuild -list -workspace "$WORKSPACE"
+
+      - name: Apply Codemagic code signing profiles
+        script: |
+          set -euo pipefail
+          xcode-project use-profiles --project "$PROJECT"
+
+      - name: Keep machine alive for VNC/Xcode session
+        script: |
+          set -euo pipefail
+          echo "Remote debug session ready."
+          echo "Connect with VNC, then use:"
+          echo "  cd \$CM_BUILD_DIR"
+          echo "  open ios/App/App.xcworkspace"
+          echo ""
+          echo "Sleeping for 90 minutes so you can use Xcode..."
+          sleep 5400
+
+    artifacts:
+      - /tmp/xcodebuild_logs/*.log
+      
   ios_app_preview_simulator:
     name: iOS App Preview Simulator
     max_build_duration: 60
