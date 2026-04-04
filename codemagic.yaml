@@ -7,7 +7,7 @@ workflows:
     environment:
       node: latest
       groups:
-        - test_flight
+        - ios_testflight
 
       ios_signing:
         distribution_type: app_store
@@ -70,14 +70,16 @@ workflows:
         script: |
           set -euo pipefail
 
-          if [ -d "${ASSET_PATH}" ]; then
-            if [ -f "${ASSET_PATH}/splash.png" ]; then
-              npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
-            else
-              echo "No splash.png found in ${ASSET_PATH} (skipping asset generation)."
-            fi
+          if [ -d "${ASSET_PATH}" ] && [ -f "${ASSET_PATH}/icon.png" ] && [ -f "${ASSET_PATH}/splash.png" ]; then
+            echo "Generating iOS app icon and splash assets from ${ASSET_PATH}"
+            npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
           else
-            echo "No ${ASSET_PATH} folder; skipping capacitor-assets generate."
+            echo "❌ Missing required assets in ${ASSET_PATH}"
+            echo "Expected:"
+            echo "  ${ASSET_PATH}/icon.png"
+            echo "  ${ASSET_PATH}/splash.png"
+            ls -la "${ASSET_PATH}" || true
+            exit 1
           fi
 
       - name: Capacitor sync iOS
@@ -85,11 +87,27 @@ workflows:
           set -euo pipefail
           npx cap sync ios
 
-      - name: Force dev bundle id in iOS native project
+      - name: Verify generated iOS assets exist
         script: |
           set -euo pipefail
 
-          echo "Forcing dev bundle id to: ${BUNDLE_ID}"
+          echo "Checking generated iOS asset catalogs..."
+
+          find ios/App -path "*AppIcon.appiconset*" -type d | head
+          find ios/App -path "*Splash.imageset*" -type d | head || true
+
+          if ! find ios/App -path "*AppIcon.appiconset*" -type d | grep -q .; then
+            echo "❌ AppIcon.appiconset was not generated"
+            exit 1
+          fi
+
+          echo "✅ iOS icon assets found."
+
+      - name: Force bundle id in iOS native project
+        script: |
+          set -euo pipefail
+
+          echo "Forcing bundle id to: ${BUNDLE_ID}"
 
           /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" ios/App/App/App/Info.plist || true
 
@@ -100,21 +118,6 @@ workflows:
             echo "Missing project.pbxproj at $PBX"
             exit 1
           fi
-
-      - name: Verify dev bundle id is set everywhere
-        script: |
-          set -euo pipefail
-
-          echo "Checking bundle IDs..."
-          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" ios/App/App/App/Info.plist || true
-          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/App/App.xcodeproj/project.pbxproj | head -20 || true
-
-          if ! grep -q "com.quantumwebdynamics.medisynclabs.dev" ios/App/App.xcodeproj/project.pbxproj; then
-            echo "❌ Dev bundle ID was not applied to project.pbxproj"
-            exit 1
-          fi
-
-          echo "✅ Dev bundle ID found in native iOS project."
 
       - name: Install CocoaPods
         script: |
@@ -175,6 +178,11 @@ workflows:
 
           cd ../..
 
+      - name: Clean Xcode derived data
+        script: |
+          set -euo pipefail
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+
       - name: Build signed IPA
         script: |
           set -euo pipefail
@@ -203,7 +211,7 @@ workflows:
     environment:
       node: latest
       groups:
-        - test_flight
+        - ios_testflight
 
       ios_signing:
         distribution_type: app_store
@@ -274,11 +282,9 @@ workflows:
           set -euo pipefail
           npx cap sync ios
 
-      - name: Force dev bundle id in iOS native project
+      - name: Force bundle id in iOS native project
         script: |
           set -euo pipefail
-
-          echo "Forcing dev bundle id to: ${BUNDLE_ID}"
 
           /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" ios/App/App/App/Info.plist || true
 
@@ -289,21 +295,6 @@ workflows:
             echo "Missing project.pbxproj at $PBX"
             exit 1
           fi
-
-      - name: Verify dev bundle id is set everywhere
-        script: |
-          set -euo pipefail
-
-          echo "Checking bundle IDs..."
-          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" ios/App/App/App/Info.plist || true
-          grep -n "PRODUCT_BUNDLE_IDENTIFIER" ios/App/App.xcodeproj/project.pbxproj | head -20 || true
-
-          if ! grep -q "com.quantumwebdynamics.medisynclabs.dev" ios/App/App.xcodeproj/project.pbxproj; then
-            echo "❌ Dev bundle ID was not applied to project.pbxproj"
-            exit 1
-          fi
-
-          echo "✅ Dev bundle ID found in native iOS project."
 
       - name: Install CocoaPods
         script: |
@@ -362,7 +353,7 @@ workflows:
 
     artifacts:
       - /tmp/xcodebuild_logs/*.log
-      
+
   ios_app_preview_simulator:
     name: iOS App Preview Simulator
     max_build_duration: 60
