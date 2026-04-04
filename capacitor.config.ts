@@ -1,3 +1,5 @@
+/// <reference types="@capacitor/push-notifications" />
+
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
@@ -6,7 +8,6 @@ const config: CapacitorConfig = {
   webDir: 'dist',
 
   server: {
-    url: 'http://192.168.1.127:8056',
     cleartext: true,
     allowNavigation: [
       '192.168.1.127',
