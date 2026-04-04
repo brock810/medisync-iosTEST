@@ -776,5 +776,88 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('unhandledrejection', hideLoading);
 });
 </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const cap = window.Capacitor;
+    const PushNotifications = cap?.Plugins?.PushNotifications;
+
+    if (!cap || !PushNotifications) {
+      console.log('[push] Capacitor or PushNotifications plugin not available');
+      return;
+    }
+
+    const platform = typeof cap.getPlatform === 'function'
+      ? cap.getPlatform()
+      : cap.platform;
+
+    console.log('[push] platform:', platform);
+
+    if (platform !== 'ios') {
+      console.log('[push] not iOS, skipping');
+      return;
+    }
+
+    await PushNotifications.removeAllListeners();
+
+    PushNotifications.addListener('registration', async (token) => {
+      console.log('[push] token received:', token?.value);
+
+      try {
+        const res = await fetch(`${BASE}/api/push/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            token: token.value,
+            platform: 'ios',
+            environment: 'development',
+            app_version: '1.0.0-dev'
+          })
+        });
+
+        const data = await res.json();
+        console.log('[push] backend save response:', data);
+      } catch (err) {
+        console.error('[push] failed to send token to backend:', err);
+      }
+    });
+
+    PushNotifications.addListener('registrationError', (error) => {
+      console.error('[push] registration error:', error);
+    });
+
+    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      console.log('[push] notification received:', notification);
+    });
+
+    PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+      console.log('[push] notification action performed:', notification);
+    });
+
+    let permStatus = await PushNotifications.checkPermissions();
+    console.log('[push] current permission:', permStatus);
+
+    if (permStatus.receive === 'prompt') {
+      permStatus = await PushNotifications.requestPermissions();
+      console.log('[push] permission after prompt:', permStatus);
+    }
+
+    if (permStatus.receive !== 'granted') {
+      console.warn('[push] permission not granted');
+      return;
+    }
+
+    await PushNotifications.register();
+    console.log('[push] register() called');
+  } catch (e) {
+    console.error('[push] init failed:', e);
+  }
+});
+</script>
+
 </body>
 </html>
