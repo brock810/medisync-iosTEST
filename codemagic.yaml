@@ -7,7 +7,7 @@ workflows:
     environment:
       node: latest
       groups:
-        - ios_testflight
+        - test_flight
 
       ios_signing:
         distribution_type: app_store
@@ -211,7 +211,7 @@ workflows:
     environment:
       node: latest
       groups:
-        - ios_testflight
+        - test_flight
 
       ios_signing:
         distribution_type: app_store
