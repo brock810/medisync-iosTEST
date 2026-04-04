@@ -780,29 +780,48 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const cap = window.Capacitor;
-    const PushNotifications = cap?.Plugins?.PushNotifications;
+    alert('[push] init started');
 
-    if (!cap || !PushNotifications) {
-      console.log('[push] Capacitor or PushNotifications plugin not available');
+    const cap = window.Capacitor;
+    if (!cap) {
+      alert('[push] window.Capacitor missing');
       return;
     }
 
     const platform = typeof cap.getPlatform === 'function'
       ? cap.getPlatform()
-      : cap.platform;
+      : (cap.platform || '');
 
-    console.log('[push] platform:', platform);
+    alert('[push] platform: ' + platform);
 
     if (platform !== 'ios') {
-      console.log('[push] not iOS, skipping');
+      alert('[push] not ios, stopping');
       return;
     }
 
-    await PushNotifications.removeAllListeners();
+    const PushNotifications =
+      cap?.Plugins?.PushNotifications ||
+      window?.Capacitor?.Plugins?.PushNotifications ||
+      window?.PushNotifications;
+
+    if (!PushNotifications) {
+      alert('[push] PushNotifications plugin missing');
+      return;
+    }
+
+    alert('[push] plugin found');
+
+    try {
+      await PushNotifications.removeAllListeners();
+      alert('[push] old listeners removed');
+    } catch (e) {
+      alert('[push] removeAllListeners failed: ' + (e?.message || e));
+    }
 
     PushNotifications.addListener('registration', async (token) => {
-      console.log('[push] token received:', token?.value);
+      const tokenValue = token?.value || '';
+      alert('[push] registration fired');
+      alert('[push] token: ' + tokenValue);
 
       try {
         const res = await fetch(`${BASE}/api/push/register`, {
@@ -812,49 +831,51 @@ document.addEventListener('DOMContentLoaded', async () => {
           },
           credentials: 'include',
           body: JSON.stringify({
-            token: token.value,
+            token: tokenValue,
             platform: 'ios',
             environment: 'development',
             app_version: '1.0.0-dev'
           })
         });
 
-        const data = await res.json();
-        console.log('[push] backend save response:', data);
+        const raw = await res.text();
+        alert('[push] backend status: ' + res.status);
+        alert('[push] backend raw response: ' + raw);
       } catch (err) {
-        console.error('[push] failed to send token to backend:', err);
+        alert('[push] backend post failed: ' + (err?.message || err));
       }
     });
 
     PushNotifications.addListener('registrationError', (error) => {
-      console.error('[push] registration error:', error);
+      alert('[push] registration error: ' + JSON.stringify(error));
     });
 
     PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('[push] notification received:', notification);
+      alert('[push] notification received: ' + JSON.stringify(notification));
     });
 
     PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      console.log('[push] notification action performed:', notification);
+      alert('[push] notification tapped: ' + JSON.stringify(notification));
     });
 
     let permStatus = await PushNotifications.checkPermissions();
-    console.log('[push] current permission:', permStatus);
+    alert('[push] current permission: ' + JSON.stringify(permStatus));
 
     if (permStatus.receive === 'prompt') {
       permStatus = await PushNotifications.requestPermissions();
-      console.log('[push] permission after prompt:', permStatus);
+      alert('[push] permission after prompt: ' + JSON.stringify(permStatus));
     }
 
     if (permStatus.receive !== 'granted') {
-      console.warn('[push] permission not granted');
+      alert('[push] permission not granted');
       return;
     }
 
+    alert('[push] calling register()');
     await PushNotifications.register();
-    console.log('[push] register() called');
+    alert('[push] register() finished');
   } catch (e) {
-    console.error('[push] init failed:', e);
+    alert('[push] init failed: ' + (e?.message || e));
   }
 });
 </script>
