@@ -823,6 +823,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('[push] registration fired');
       alert('[push] token: ' + tokenValue);
 
+      if (!tokenValue) return;
+
+      localStorage.setItem('msl_push_token', tokenValue);
+
       try {
         const res = await fetch(`${BASE}/api/push/register`, {
           method: 'POST',
@@ -876,6 +880,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     alert('[push] register() finished');
   } catch (e) {
     alert('[push] init failed: ' + (e?.message || e));
+  }
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const savedToken = localStorage.getItem('msl_push_token');
+    if (!savedToken) {
+      return;
+    }
+
+    const tryRelink = async () => {
+      try {
+        const res = await fetch(`${BASE}/api/push/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            token: savedToken,
+            platform: 'ios',
+            environment: 'development',
+            app_version: '1.0.0-dev'
+          })
+        });
+
+        const raw = await res.text();
+        console.log('[push] relink status:', res.status);
+        console.log('[push] relink raw response:', raw);
+      } catch (err) {
+        console.error('[push] relink failed:', err);
+      }
+    };
+
+    const form = document.getElementById('iosQuickSignupForm');
+    if (form) {
+      form.addEventListener('submit', function () {
+        setTimeout(() => {
+          tryRelink();
+        }, 2500);
+      });
+    }
+  } catch (e) {
+    console.error('[push] saved token relink init failed:', e);
   }
 });
 </script>
